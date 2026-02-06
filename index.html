@@ -9,37 +9,84 @@
     <link rel="stylesheet" href="lib/leaflet.css" />
     
     <style>
-        body, html { height: 100%; margin: 0; padding: 0; font-family: sans-serif; }
-        #map { height: 100%; width: 100%; }
+        body, html { height: 100%; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; touch-action: manipulation; }
+        #map { height: 100%; width: 100%; z-index: 1; }
         
         /* UI Panels */
         .panel {
             position: absolute;
             background: white;
             padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
             z-index: 1000;
             display: none;
-            max-width: 90%;
             width: 300px;
         }
         
-        /* Admin Panel (Right Side) */
+        /* Admin Panel (Desktop/Tablet default) */
         #admin-panel {
-            top: 10px;
+            top: 60px; /* Moved down to avoid potential HTTPS warning */
             right: 10px;
             max-height: 80vh;
             overflow-y: auto;
             width: 350px;
+            max-width: 90vw;
         }
 
-        /* Player Action Panel (Bottom Center) */
+        /* Player Action Panel (Mobile Bottom Sheet Style) */
         #player-panel {
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            text-align: center;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            transform: none;
+            border-radius: 16px 16px 0 0;
+            padding: 20px;
+            box-sizing: border-box;
+            max-width: 100%;
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 600px) {
+            #admin-panel {
+                top: auto;
+                bottom: 0;
+                right: 0;
+                left: 0;
+                width: 100%;
+                max-width: 100%;
+                max-height: 50vh;
+                border-radius: 16px 16px 0 0;
+            }
+            
+            /* Move leaderboard button to bottom left on mobile */
+            .leaderboard-toggle-btn {
+                top: auto;
+                bottom: 30px;
+                left: 10px;
+                font-size: 14px;
+                padding: 8px 12px;
+                z-index: 2000; /* Ensure it's above everything */
+            }
+
+            .btn {
+                padding: 12px 20px; /* Larger touch target */
+                font-size: 16px;
+                margin-bottom: 8px;
+            }
+
+            .login-box {
+                width: 90%;
+                padding: 1.5rem;
+            }
+            
+            h2, h3 { margin-top: 0; }
         }
 
         /* Overlays */
@@ -48,39 +95,45 @@
             background: rgba(0,0,0,0.85); z-index: 9999;
             display: flex; align-items: center; justify-content: center;
         }
-        #loading-overlay { display: none; color: white; flex-direction: column; }
+        #loading-overlay { display: none; color: white; flex-direction: column; text-align: center; padding: 20px; }
 
         .login-box {
-            background: white; padding: 2rem; border-radius: 8px;
+            background: white; padding: 2rem; border-radius: 12px;
             width: 100%; max-width: 320px; text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
         }
         
         .btn {
             background: #2c3e50; color: white; border: none;
-            padding: 10px 20px; border-radius: 4px; cursor: pointer;
+            padding: 12px 24px; border-radius: 8px; cursor: pointer;
             margin: 5px; width: 100%; font-size: 16px;
+            font-weight: 600;
+            transition: background 0.2s, transform 0.1s;
         }
+        .btn:active { transform: scale(0.98); }
         .btn.green { background: #27ae60; }
         .btn.red { background: #c0392b; }
         .btn:disabled { background: #95a5a6; cursor: not-allowed; }
 
         input, select, textarea {
-            width: 100%; padding: 8px; margin-bottom: 10px;
-            border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;
+            width: 100%; padding: 12px; margin-bottom: 15px;
+            border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box;
+            font-size: 16px; /* Prevents iOS zoom */
+            background: #f9f9f9;
         }
 
         .request-item {
-            border: 1px solid #eee; padding: 10px; margin-bottom: 10px;
-            border-radius: 4px; background: #f9f9f9;
+            border: 1px solid #eee; padding: 12px; margin-bottom: 10px;
+            border-radius: 8px; background: #f8f9fa;
         }
-        .request-item h4 { margin: 0 0 5px 0; }
+        .request-item h4 { margin: 0 0 5px 0; font-size: 1.1em; }
         
         .label-icon {
-            background: black; color: white; border: 2px solid white;
+            background: rgba(0,0,0,0.8); color: white; border: 2px solid white;
             border-radius: 50%; width: 24px; height: 24px;
             display: flex; align-items: center; justify-content: center;
             font-weight: bold; font-size: 12px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.4);
         }
         .label-icon.locked {
             background: #c0392b; /* Red background for locked */
@@ -92,13 +145,14 @@
         #leaderboard-panel {
             position: fixed;
             top: 0;
-            left: -320px; /* Hidden by default */
-            width: 300px;
+            left: -100%; /* Hidden by default */
+            width: 100%;
+            max-width: 350px;
             height: 100%;
             background: white;
             box-shadow: 2px 0 10px rgba(0,0,0,0.3);
-            z-index: 2000;
-            transition: left 0.3s ease;
+            z-index: 11000; /* Above HTTPS warning */
+            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             padding: 20px;
             box-sizing: border-box;
             overflow-y: auto;
@@ -108,17 +162,17 @@
         }
         .leaderboard-toggle-btn {
             position: fixed;
-            top: 20px;
+            top: 20px; /* Moved back to top, let's try right side for mobile */
             left: 20px;
             z-index: 1500;
             background: #2c3e50;
             color: white;
             border: none;
             padding: 10px 15px;
-            border-radius: 4px;
+            border-radius: 50px; /* Pill shape */
             cursor: pointer;
             font-weight: bold;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
         .leaderboard-table {
             width: 100%;
@@ -126,12 +180,13 @@
             margin-top: 15px;
         }
         .leaderboard-table th, .leaderboard-table td {
-            padding: 8px;
+            padding: 12px 8px;
             text-align: left;
             border-bottom: 1px solid #eee;
         }
         .leaderboard-table th {
             background-color: #f8f9fa;
+            font-weight: 600;
         }
         .team-dot {
             display: inline-block;
@@ -140,9 +195,49 @@
             border-radius: 50%;
             margin-right: 8px;
         }
+
+        /* HTTPS Warning */
+        #https-warning {
+            display: none;
+            background: #fff3cd;
+            color: #856404;
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #ffeeba;
+            position: fixed;
+            top: 0; left: 0; width: 100%;
+            z-index: 10000;
+            font-size: 14px;
+        }
+
+        /* Leaderboard Tabs */
+        .leaderboard-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: bold;
+            color: #7f8c8d;
+        }
+        .tab-btn.active {
+            border-bottom-color: #2c3e50;
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
+    <div id="https-warning">
+        ⚠️ Pozor: Pro správnou funkčnost GPS je nutné hrát přes HTTPS (nebo localhost). Na běžném HTTP připojení nebude lokalizace fungovat.
+        <button onclick="document.getElementById('https-warning').style.display='none'" style="margin-left:10px;border:none;background:none;cursor:pointer;">✖</button>
+    </div>
 
     <!-- Login -->
     <div id="login-overlay">
@@ -183,18 +278,36 @@
             <h2>Žebříček</h2>
             <button onclick="toggleLeaderboard()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>
         </div>
-        <p>Pořadí podle času držení území:</p>
-        <table class="leaderboard-table">
-            <thead>
-                <tr>
-                    <th>Tým</th>
-                    <th>Čas</th>
-                </tr>
-            </thead>
-            <tbody id="leaderboard-body">
-                <!-- Data populated by JS -->
-            </tbody>
-        </table>
+        
+        <div class="leaderboard-tabs">
+            <button class="tab-btn active" onclick="switchTab('final')">Finále</button>
+            <button class="tab-btn" onclick="switchTab('time')">Čas</button>
+            <button class="tab-btn" onclick="switchTab('count')">Počet</button>
+        </div>
+
+        <div id="tab-final" class="tab-content" style="display:block;">
+            <p><strong>Finální pořadí</strong> (průměr umístění):</p>
+            <table class="leaderboard-table">
+                <thead><tr><th>Tým</th><th>Průměr</th></tr></thead>
+                <tbody id="leaderboard-body-final"></tbody>
+            </table>
+        </div>
+
+        <div id="tab-time" class="tab-content" style="display:none;">
+            <p><strong>Celkový čas</strong> držení území:</p>
+            <table class="leaderboard-table">
+                <thead><tr><th>Tým</th><th>Čas</th></tr></thead>
+                <tbody id="leaderboard-body-time"></tbody>
+            </table>
+        </div>
+
+        <div id="tab-count" class="tab-content" style="display:none;">
+            <p><strong>Počet</strong> aktuálně zabraných území:</p>
+            <table class="leaderboard-table">
+                <thead><tr><th>Tým</th><th>Počet</th></tr></thead>
+                <tbody id="leaderboard-body-count"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="map"></div>
@@ -233,6 +346,11 @@
     <script src="lib/socket.io.min.js"></script>
 
     <script>
+        // Check for HTTPS/Secure Context
+        if (!window.isSecureContext && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+            document.getElementById('https-warning').style.display = 'block';
+        }
+
         const socket = io();
         let currentUser = null;
         let currentRole = null; // 'admin' or 'team'
@@ -247,6 +365,7 @@
         let globalTerritories = {};
         let globalScores = {}; // Historical scores from server
         let territoryLabels = {}; // { territoryId: marker }
+        let currentReqIdForTask = null;
         
         // Team Colors Helper
         const teamColors = {
@@ -291,9 +410,16 @@
             }
             if(data.territories) {
                 globalTerritories = data.territories;
+                if(data.scores) globalScores = data.scores; // Load historical scores
                 updateLeaderboardUI();
                 updateTerritoryLabels();
             }
+        });
+
+        // Init scores for normal user
+        socket.on('init_scores', (scores) => {
+             globalScores = scores;
+             updateLeaderboardUI();
         });
 
         // Admin: Request updated
@@ -352,6 +478,7 @@
         socket.on('game_state_update', (data) => {
              if (data.territories) {
                 globalTerritories = data.territories;
+                if(data.scores) globalScores = data.scores; // Sync scores
                 updateMapColors(data.territories);
                 updateTerritoryLabels();
                 updateLeaderboardUI();
@@ -390,6 +517,22 @@
             document.getElementById('leaderboard-panel').classList.toggle('open');
         }
 
+        function switchTab(tabName) {
+            // Hide all
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            
+            // Show target
+            document.getElementById('tab-' + tabName).style.display = 'block';
+            
+            // Activate button (find by onclick text roughly or index)
+            // Simpler: iterate buttons and check onclick attribute, or just rely on text
+            const btns = document.querySelectorAll('.tab-btn');
+            if(tabName === 'final') btns[0].classList.add('active');
+            if(tabName === 'time') btns[1].classList.add('active');
+            if(tabName === 'count') btns[2].classList.add('active');
+        }
+
         function formatTime(seconds) {
             const h = Math.floor(seconds / 3600);
             const m = Math.floor((seconds % 3600) / 60);
@@ -398,39 +541,81 @@
         }
 
         function updateLeaderboardUI() {
-            const scores = {}; // team -> total seconds
-            const now = Date.now() / 1000; // Client time in seconds
+            const timeScores = {};
+            const countScores = {};
+            const teamList = Object.keys(teamNames);
+            const now = Date.now() / 1000;
 
-            // Initialize scores
-            Object.keys(teamNames).forEach(team => scores[team] = 0);
+            // Init
+            teamList.forEach(team => {
+                timeScores[team] = globalScores[team] || 0;
+                countScores[team] = 0;
+            });
 
-            // Calculate scores
+            // Calculate current stats
             for (const tId in globalTerritories) {
                 const t = globalTerritories[tId];
-                if (t.owner && t.capturedAt) {
-                    const duration = now - t.capturedAt;
-                    if (duration > 0) {
-                        scores[t.owner] = (scores[t.owner] || 0) + duration;
+                if (t.owner) {
+                    // Count
+                    countScores[t.owner] = (countScores[t.owner] || 0) + 1;
+                    
+                    // Time (Current session)
+                    if (t.capturedAt) {
+                         const duration = now - t.capturedAt;
+                         if (duration > 0) {
+                             timeScores[t.owner] = (timeScores[t.owner] || 0) + duration;
+                         }
                     }
                 }
             }
 
-            // Convert to array and sort
-            const sortedTeams = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+            // Rank by Time
+            const timeRanked = [...teamList].sort((a, b) => timeScores[b] - timeScores[a]);
+            const timeRanks = {};
+            timeRanked.forEach((team, index) => timeRanks[team] = index + 1);
 
-            // Render
-            const tbody = document.getElementById('leaderboard-body');
+            // Rank by Count
+            const countRanked = [...teamList].sort((a, b) => countScores[b] - countScores[a]);
+            const countRanks = {};
+            countRanked.forEach((team, index) => countRanks[team] = index + 1);
+
+            // Final Rank (Average placement)
+            const finalScores = {};
+            teamList.forEach(team => {
+                finalScores[team] = (timeRanks[team] + countRanks[team]) / 2;
+            });
+            const finalRanked = [...teamList].sort((a, b) => finalScores[a] - finalScores[b]); // Lower is better
+
+            // Render Tables
+            renderTable('leaderboard-body-final', finalRanked, finalScores, '', true);
+            renderTable('leaderboard-body-time', timeRanked, timeScores, '', false, true);
+            renderTable('leaderboard-body-count', countRanked, countScores, '');
+        }
+
+        function renderTable(tbodyId, rankedTeams, scoresObj, suffix, isAvg = false, isTime = false) {
+            const tbody = document.getElementById(tbodyId);
+            if(!tbody) return;
             tbody.innerHTML = '';
 
-            sortedTeams.forEach(team => {
-                const timeStr = formatTime(scores[team]);
+            rankedTeams.forEach((team, index) => {
+                let valStr = scoresObj[team];
+                if(isTime) valStr = formatTime(valStr);
+                else if(isAvg) valStr = valStr.toFixed(1); // 1 decimal for average
+                
                 const row = document.createElement('tr');
+                // Highlight top 3
+                let medal = '';
+                if(index === 0) medal = '🥇 ';
+                if(index === 1) medal = '🥈 ';
+                if(index === 2) medal = '🥉 ';
+
                 row.innerHTML = `
                     <td>
+                        ${medal}
                         <span class="team-dot" style="background-color: ${teamColors[team] || '#ccc'}"></span>
                         ${teamNames[team] || team}
                     </td>
-                    <td style="font-family:monospace; font-weight:bold;">${timeStr}</td>
+                    <td style="font-family:monospace; font-weight:bold;">${valStr}${suffix}</td>
                 `;
                 tbody.appendChild(row);
             });

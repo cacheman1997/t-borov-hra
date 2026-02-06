@@ -63,11 +63,12 @@ def handle_join(data):
         join_room(f"team_{team_id}")
         teams[team_id] = request.sid
         emit('map_update', territories, to=request.sid) # Send current map state
+        emit('init_scores', team_scores, to=request.sid) # Send scores
         print(f"Team {team_id} joined")
     elif role == 'admin':
         join_room('admin')
         # Send current state to admin
-        emit('init_state', {'territories': territories, 'requests': active_requests}, to=request.sid)
+        emit('init_state', {'territories': territories, 'requests': active_requests, 'scores': team_scores}, to=request.sid)
         print("Admin joined")
 
 @socketio.on('request_location_check')
