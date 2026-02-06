@@ -143,22 +143,24 @@
 
         /* Leaderboard */
         #leaderboard-panel {
-            position: fixed;
-            top: 0;
-            left: -100%; /* Hidden by default */
-            width: 100%;
-            max-width: 350px;
-            height: 100%;
+            position: absolute;
+            top: 60px; /* Below the warning if present, or just below top */
+            left: 10px;
+            width: 300px;
+            max-width: 80%; /* Don't cover full width on small screens */
+            height: auto;
+            max-height: 50vh; /* Only half height */
             background: white;
-            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
-            z-index: 11000; /* Above HTTPS warning */
-            transition: left 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+            z-index: 11000;
+            border-radius: 12px;
+            display: none; /* Hidden by default, toggle with button */
+            padding: 15px;
             box-sizing: border-box;
             overflow-y: auto;
         }
         #leaderboard-panel.open {
-            left: 0;
+            display: block;
         }
         .leaderboard-toggle-btn {
             position: fixed;
@@ -210,28 +212,7 @@
             font-size: 14px;
         }
 
-        /* Leaderboard Tabs */
-        .leaderboard-tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 15px;
-            border-bottom: 2px solid #eee;
-        }
-        .tab-btn {
-            flex: 1;
-            padding: 10px;
-            background: none;
-            border: none;
-            border-bottom: 3px solid transparent;
-            cursor: pointer;
-            font-weight: bold;
-            color: #7f8c8d;
-        }
-        .tab-btn.active {
-            border-bottom-color: #2c3e50;
-            color: #2c3e50;
-        }
-    </style>
+    <style>
 </head>
 <body>
     <div id="https-warning">
@@ -278,36 +259,18 @@
             <h2>Žebříček</h2>
             <button onclick="toggleLeaderboard()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>
         </div>
-        
-        <div class="leaderboard-tabs">
-            <button class="tab-btn active" onclick="switchTab('final')">Finále</button>
-            <button class="tab-btn" onclick="switchTab('time')">Čas</button>
-            <button class="tab-btn" onclick="switchTab('count')">Počet</button>
-        </div>
-
-        <div id="tab-final" class="tab-content" style="display:block;">
-            <p><strong>Finální pořadí</strong> (průměr umístění):</p>
-            <table class="leaderboard-table">
-                <thead><tr><th>Tým</th><th>Průměr</th></tr></thead>
-                <tbody id="leaderboard-body-final"></tbody>
-            </table>
-        </div>
-
-        <div id="tab-time" class="tab-content" style="display:none;">
-            <p><strong>Celkový čas</strong> držení území:</p>
-            <table class="leaderboard-table">
-                <thead><tr><th>Tým</th><th>Čas</th></tr></thead>
-                <tbody id="leaderboard-body-time"></tbody>
-            </table>
-        </div>
-
-        <div id="tab-count" class="tab-content" style="display:none;">
-            <p><strong>Počet</strong> aktuálně zabraných území:</p>
-            <table class="leaderboard-table">
-                <thead><tr><th>Tým</th><th>Počet</th></tr></thead>
-                <tbody id="leaderboard-body-count"></tbody>
-            </table>
-        </div>
+        <p>Pořadí podle času držení území:</p>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Tým</th>
+                    <th>Čas</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body">
+                <!-- Data populated by JS -->
+            </tbody>
+        </table>
     </div>
 
     <div id="map"></div>
@@ -514,7 +477,14 @@
         // --- Leaderboard Logic ---
         
         function toggleLeaderboard() {
-            document.getElementById('leaderboard-panel').classList.toggle('open');
+            const panel = document.getElementById('leaderboard-panel');
+            if (panel.style.display === 'block' || panel.classList.contains('open')) {
+                panel.style.display = 'none';
+                panel.classList.remove('open');
+            } else {
+                panel.style.display = 'block';
+                panel.classList.add('open');
+            }
         }
 
         function switchTab(tabName) {
