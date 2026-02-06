@@ -1,0 +1,890 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Táborová Hra - Území</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="lib/leaflet.css" />
+    
+    <style>
+        body, html { height: 100%; margin: 0; padding: 0; font-family: sans-serif; }
+        #map { height: 100%; width: 100%; }
+        
+        /* UI Panels */
+        .panel {
+            position: absolute;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.2);
+            z-index: 1000;
+            display: none;
+            max-width: 90%;
+            width: 300px;
+        }
+        
+        /* Admin Panel (Right Side) */
+        #admin-panel {
+            top: 10px;
+            right: 10px;
+            max-height: 80vh;
+            overflow-y: auto;
+            width: 350px;
+        }
+
+        /* Player Action Panel (Bottom Center) */
+        #player-panel {
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+        }
+
+        /* Overlays */
+        #login-overlay, #loading-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.85); z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #loading-overlay { display: none; color: white; flex-direction: column; }
+
+        .login-box {
+            background: white; padding: 2rem; border-radius: 8px;
+            width: 100%; max-width: 320px; text-align: center;
+        }
+        
+        .btn {
+            background: #2c3e50; color: white; border: none;
+            padding: 10px 20px; border-radius: 4px; cursor: pointer;
+            margin: 5px; width: 100%; font-size: 16px;
+        }
+        .btn.green { background: #27ae60; }
+        .btn.red { background: #c0392b; }
+        .btn:disabled { background: #95a5a6; cursor: not-allowed; }
+
+        input, select, textarea {
+            width: 100%; padding: 8px; margin-bottom: 10px;
+            border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box;
+        }
+
+        .request-item {
+            border: 1px solid #eee; padding: 10px; margin-bottom: 10px;
+            border-radius: 4px; background: #f9f9f9;
+        }
+        .request-item h4 { margin: 0 0 5px 0; }
+        
+        .label-icon {
+            background: black; color: white; border: 2px solid white;
+            border-radius: 50%; width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: bold; font-size: 12px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+        .label-icon.locked {
+            background: #c0392b; /* Red background for locked */
+            font-size: 14px;
+        }
+        .leaflet-tooltip.label-icon::before { display: none; }
+
+        /* Leaderboard */
+        #leaderboard-panel {
+            position: fixed;
+            top: 0;
+            left: -320px; /* Hidden by default */
+            width: 300px;
+            height: 100%;
+            background: white;
+            box-shadow: 2px 0 10px rgba(0,0,0,0.3);
+            z-index: 2000;
+            transition: left 0.3s ease;
+            padding: 20px;
+            box-sizing: border-box;
+            overflow-y: auto;
+        }
+        #leaderboard-panel.open {
+            left: 0;
+        }
+        .leaderboard-toggle-btn {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 1500;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+        .leaderboard-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        .leaderboard-table th, .leaderboard-table td {
+            padding: 8px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .leaderboard-table th {
+            background-color: #f8f9fa;
+        }
+        .team-dot {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Login -->
+    <div id="login-overlay">
+        <div class="login-box">
+            <h2>Přihlášení</h2>
+            <select id="team-select">
+                <option value="" disabled selected>Vyberte tým...</option>
+                <optgroup label="Týmy">
+                    <option value="cerveni">Červení</option>
+                    <option value="modri">Modří</option>
+                    <option value="zeleni">Zelení</option>
+                    <option value="zluti">Žlutí</option>
+                    <option value="oranzovi">Oranžoví</option>
+                    <option value="fialovi">Fialoví</option>
+                </optgroup>
+                <optgroup label="Správa">
+                    <option value="admin">Admin</option>
+                </optgroup>
+            </select>
+            <input type="password" id="password" placeholder="Heslo">
+            <button class="btn" onclick="handleLogin()">Vstoupit</button>
+            <p id="login-error" style="color:red;display:none;"></p>
+        </div>
+    </div>
+
+    <!-- Loading / Status Overlay -->
+    <div id="loading-overlay">
+        <h3 id="loading-text">Čekám na odpověď admina...</h3>
+        <div class="loader"></div>
+        <button id="cancel-loading-btn" class="btn red" style="margin-top:20px; max-width:200px;" onclick="cancelMyRequest()">Zrušit žádost</button>
+    </div>
+
+    <!-- Leaderboard UI -->
+    <button class="leaderboard-toggle-btn" onclick="toggleLeaderboard()">🏆 Žebříček</button>
+    
+    <div id="leaderboard-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <h2>Žebříček</h2>
+            <button onclick="toggleLeaderboard()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>
+        </div>
+        <p>Pořadí podle času držení území:</p>
+        <table class="leaderboard-table">
+            <thead>
+                <tr>
+                    <th>Tým</th>
+                    <th>Čas</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboard-body">
+                <!-- Data populated by JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- Admin Panel -->
+    <div id="admin-panel" class="panel">
+        <h3>Příchozí žádosti</h3>
+        <button class="btn red" style="margin-bottom: 10px; width: 100%; font-size: 12px;" onclick="clearAllRequests()">Vyčistit všechny žádosti</button>
+        <div id="requests-list">
+            <!-- Requests will appear here -->
+            <p style="color:#7f8c8d; font-style:italic;">Žádné aktivní žádosti.</p>
+        </div>
+    </div>
+
+    <!-- Player Action Panel -->
+    <div id="player-panel" class="panel">
+        <h3 id="player-panel-title">Území</h3>
+        <div id="player-content"></div>
+    </div>
+
+    <!-- Task Assignment Modal -->
+    <div id="task-modal" style="display:none; position:fixed; top:50%; left:50%; transform:translate(-50%, -50%); z-index:10001; box-shadow: 0 0 20px rgba(0,0,0,0.5); background: white; padding: 2rem; border-radius: 8px; width: 100%; max-width: 320px; text-align: center;">
+        <h3>Zadat úkol</h3>
+        <textarea id="task-input" rows="4" style="width:100%;" placeholder="Napište zadání úkolu..."></textarea>
+        <div style="display:flex; gap:10px; margin-top:10px;">
+            <button class="btn green" onclick="confirmTask()">Odeslat</button>
+            <button class="btn red" onclick="closeTaskModal()">Zrušit</button>
+        </div>
+    </div>
+
+    <div id="modal-backdrop" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:10000;" onclick="closeTaskModal()"></div>
+
+    <!-- Libs -->
+    <script src="lib/leaflet.js"></script>
+    <script src="lib/polylabel.js"></script>
+    <script src="lib/socket.io.min.js"></script>
+
+    <script>
+        const socket = io();
+        let currentUser = null;
+        let currentRole = null; // 'admin' or 'team'
+        let currentTerritory = null; // Currently selected territory ID
+        let myRequest = null; // Current active request for this team
+        
+        // Markers
+        let myLocationMarker = null;
+        let adminRequestMarkers = {}; // { reqId: marker }
+        
+        // Global state for scoring
+        let globalTerritories = {};
+        let globalScores = {}; // Historical scores from server
+        let territoryLabels = {}; // { territoryId: marker }
+        
+        // Team Colors Helper
+        const teamColors = {
+            'cerveni': '#e74c3c', 'modri': '#3498db', 'zeleni': '#2ecc71',
+            'zluti': '#f1c40f', 'oranzovi': '#e67e22', 'fialovi': '#9b59b6',
+            'bilí': '#ecf0f1'
+        };
+        const teamNames = {
+             'cerveni': 'Červení', 'modri': 'Modří', 'zeleni': 'Zelení',
+             'zluti': 'Žlutí', 'oranzovi': 'Oranžoví', 'fialovi': 'Fialoví',
+             'bilí': 'Bílí'
+        };
+
+        // --- Socket Events ---
+
+        socket.on('connect', () => {
+            console.log("Connected to server");
+        });
+
+        // Admin: Receive new request
+        socket.on('new_request', (req) => {
+            if(currentRole === 'admin') {
+                renderAdminRequests([req], true);
+                addAdminMarker(req);
+                // Auto-zoom to the new request
+                map.setView([req.lat, req.lng], 18);
+            }
+        });
+
+        // Admin: Receive init state
+        socket.on('init_state', (data) => {
+            if(currentRole === 'admin') {
+                const reqs = Object.values(data.requests);
+                // Sort by timestamp (oldest first) to ensure correct order
+                reqs.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+                
+                renderAdminRequests(reqs, false);
+                // Add markers for existing requests
+                reqs.forEach(req => addAdminMarker(req));
+                updateMapColors(data.territories);
+                updateTerritoryLabels();
+            }
+            if(data.territories) {
+                globalTerritories = data.territories;
+                updateLeaderboardUI();
+                updateTerritoryLabels();
+            }
+        });
+
+        // Admin: Request updated
+        socket.on('request_updated', (req) => {
+             if(currentRole === 'admin') updateAdminRequestUI(req);
+        });
+        
+        // Admin: Request removed
+        socket.on('request_removed', (data) => {
+             if(currentRole === 'admin') {
+                 const el = document.getElementById(`req-${data.reqId}`);
+                 if(el) el.remove();
+             }
+        });
+
+        // Admin: Task Response Received
+        socket.on('task_response_received', (req) => {
+            if(currentRole === 'admin') updateAdminRequestUI(req);
+        });
+
+        // Team: Location Verification Result
+        socket.on('location_verification_result', (data) => {
+            hideLoading();
+            if (data.approved) {
+                showTaskUI(data.taskText, data.reqId);
+            } else {
+                alert("Admin vaši polohu zamítl. Zkuste to znovu.");
+                myRequest = null;
+            }
+        });
+
+        // Team: Task Result
+        socket.on('task_result', (data) => {
+            hideLoading();
+            if (data.approved) {
+                alert(`Gratulujeme! Území ${data.territoryId} je vaše!`);
+                document.getElementById('player-panel').style.display = 'none';
+            } else {
+                alert("Úkol nebyl splněn (zamítnuto adminem). Zkuste to znovu.");
+                // Hide player panel if rejected
+                document.getElementById('player-panel').style.display = 'none';
+                document.getElementById('player-content').innerHTML = '';
+            }
+            myRequest = null;
+        });
+
+        // Global: Map Update
+        socket.on('map_update', (territories) => {
+            globalTerritories = territories;
+            updateMapColors(territories);
+            updateTerritoryLabels();
+            updateLeaderboardUI();
+        });
+
+        // Fix: Listen for game_state_update
+        socket.on('game_state_update', (data) => {
+             if (data.territories) {
+                globalTerritories = data.territories;
+                updateMapColors(data.territories);
+                updateTerritoryLabels();
+                updateLeaderboardUI();
+             }
+        });
+
+        // Polling every 10 seconds
+        setInterval(() => {
+            if (currentUser) {
+                socket.emit('request_map_update');
+            }
+        }, 10000);
+
+        socket.on('error_message', (data) => {
+            alert(data.message);
+        });
+
+        socket.on('request_cancelled_confirmation', () => {
+            hideLoading();
+            document.getElementById('player-panel').style.display = 'none';
+            document.getElementById('player-content').innerHTML = '';
+            
+            // Remove my marker if exists
+            if (myLocationMarker) {
+                map.removeLayer(myLocationMarker);
+                myLocationMarker = null;
+            }
+            
+            myRequest = null;
+            alert("Žádost byla zrušena.");
+        });
+
+        // --- Leaderboard Logic ---
+        
+        function toggleLeaderboard() {
+            document.getElementById('leaderboard-panel').classList.toggle('open');
+        }
+
+        function formatTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = Math.floor(seconds % 60);
+            return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+        }
+
+        function updateLeaderboardUI() {
+            const scores = {}; // team -> total seconds
+            const now = Date.now() / 1000; // Client time in seconds
+
+            // Initialize scores
+            Object.keys(teamNames).forEach(team => scores[team] = 0);
+
+            // Calculate scores
+            for (const tId in globalTerritories) {
+                const t = globalTerritories[tId];
+                if (t.owner && t.capturedAt) {
+                    const duration = now - t.capturedAt;
+                    if (duration > 0) {
+                        scores[t.owner] = (scores[t.owner] || 0) + duration;
+                    }
+                }
+            }
+
+            // Convert to array and sort
+            const sortedTeams = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+
+            // Render
+            const tbody = document.getElementById('leaderboard-body');
+            tbody.innerHTML = '';
+
+            sortedTeams.forEach(team => {
+                const timeStr = formatTime(scores[team]);
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>
+                        <span class="team-dot" style="background-color: ${teamColors[team] || '#ccc'}"></span>
+                        ${teamNames[team] || team}
+                    </td>
+                    <td style="font-family:monospace; font-weight:bold;">${timeStr}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Update leaderboard every second to animate the timer
+        setInterval(() => {
+            updateLeaderboardUI();
+            updateTerritoryLabels();
+        }, 1000);
+
+        // --- UI Logic ---
+
+        function handleLogin() {
+            const team = document.getElementById('team-select').value;
+            const pwd = document.getElementById('password').value;
+            
+            if (!team) return;
+            if (pwd !== '1234') { // Simple password
+                document.getElementById('login-error').innerText = "Špatné heslo";
+                document.getElementById('login-error').style.display = 'block';
+                return;
+            }
+
+            currentUser = team;
+            currentRole = team === 'admin' ? 'admin' : 'team';
+            
+            document.getElementById('login-overlay').style.display = 'none';
+            
+            // Join socket room
+            socket.emit('join_game', { role: currentRole, teamId: currentUser });
+
+            if (currentRole === 'admin') {
+                document.getElementById('admin-panel').style.display = 'block';
+            }
+        }
+
+        function showLoading(text) {
+            document.getElementById('loading-text').innerText = text;
+            document.getElementById('loading-overlay').style.display = 'flex';
+            
+            // Only show cancel button if it's a request, not general loading
+            if (text.includes("GPS")) {
+                 document.getElementById('cancel-loading-btn').style.display = 'none';
+            } else {
+                 document.getElementById('cancel-loading-btn').style.display = 'block';
+            }
+        }
+        
+        function hideLoading() {
+            document.getElementById('loading-overlay').style.display = 'none';
+        }
+
+        function cancelMyRequest() {
+            if (confirm("Opravdu chcete zrušit aktuální žádost?")) {
+                socket.emit('cancel_request', { teamId: currentUser });
+            }
+        }
+
+        // --- Player Flow ---
+
+        function requestLocationCheck(territoryId) {
+            if (myRequest) {
+                alert("Máte již aktivní žádost!");
+                return;
+            }
+
+            if (!navigator.geolocation) {
+                alert("Váš prohlížeč nepodporuje geolokaci.");
+                return;
+            }
+
+            showLoading("Získávám GPS polohu...");
+            
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const lat = pos.coords.latitude;
+                const lng = pos.coords.longitude;
+                
+                // Show player marker
+                if (myLocationMarker) map.removeLayer(myLocationMarker);
+                myLocationMarker = L.circleMarker([lat, lng], {
+                    radius: 10,
+                    fillColor: "#3388ff",
+                    color: "#fff",
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map);
+                
+                // Zoom to location so user sees it
+                map.setView([lat, lng], 18);
+
+                showLoading("Čekám na schválení adminem...");
+                
+                socket.emit('request_location_check', {
+                    teamId: currentUser,
+                    lat: lat,
+                    lng: lng,
+                    territoryId: territoryId
+                });
+                
+                myRequest = { territoryId: territoryId, status: 'pending' };
+
+            }, (err) => {
+                hideLoading();
+                alert("Chyba GPS: " + err.message);
+            });
+        }
+
+        function showTaskUI(taskText, reqId) {
+            const panel = document.getElementById('player-panel');
+            const content = document.getElementById('player-content');
+            
+            panel.style.display = 'block';
+            document.getElementById('player-panel-title').innerText = "Úkol";
+            
+            content.innerHTML = `
+                <p><strong>Zadání:</strong> ${taskText}</p>
+                <textarea id="task-answer" placeholder="Napište odpověď..."></textarea>
+                <input type="file" id="task-file" accept="image/*,video/*">
+                <div style="display:flex; gap:5px;">
+                    <button class="btn green" onclick="submitTask('${reqId}')">Odeslat odpověď</button>
+                    <button class="btn red" onclick="cancelMyRequest()">Vzdát to</button>
+                </div>
+            `;
+        }
+
+        async function submitTask(reqId) {
+            const text = document.getElementById('task-answer').value;
+            const fileInput = document.getElementById('task-file');
+            
+            let filename = null;
+
+            if (fileInput.files.length > 0) {
+                const formData = new FormData();
+                formData.append('file', fileInput.files[0]);
+                
+                try {
+                    const res = await fetch('/upload', { method: 'POST', body: formData });
+                    const data = await res.json();
+                    if (res.ok) filename = data.filename;
+                } catch (e) {
+                    console.error("Upload failed", e);
+                    alert("Chyba při nahrávání souboru");
+                    return;
+                }
+            }
+
+            if (!text && !filename) {
+                alert("Vyplňte odpověď nebo nahrajte soubor.");
+                return;
+            }
+
+            showLoading("Odesílám odpověď ke kontrole...");
+            socket.emit('submit_task_response', {
+                reqId: reqId,
+                responseType: filename ? 'file' : 'text',
+                content: filename || text
+            });
+        }
+
+        // --- Admin Flow ---
+
+        function renderAdminRequests(requests, append) {
+            const list = document.getElementById('requests-list');
+            if (!append) list.innerHTML = '';
+            
+            if (requests.length === 0 && !append && list.children.length === 0) {
+                list.innerHTML = '<p style="color:#7f8c8d; font-style:italic;">Žádné aktivní žádosti.</p>';
+                return;
+            }
+
+            requests.forEach(req => {
+                // If it exists, update it instead
+                if (document.getElementById(`req-${req.id}`)) {
+                    updateAdminRequestUI(req);
+                    return;
+                }
+                
+                const div = document.createElement('div');
+                div.id = `req-${req.id}`;
+                div.className = 'request-item';
+                div.innerHTML = getRequestHTML(req);
+                list.appendChild(div);
+            });
+        }
+
+        function updateAdminRequestUI(req) {
+            const el = document.getElementById(`req-${req.id}`);
+            if (el) el.innerHTML = getRequestHTML(req);
+        }
+
+        function getRequestHTML(req) {
+            let html = `<h4>Tým: ${req.teamId} (Území ${req.territoryId})</h4>`;
+            
+            if (req.status === 'pending') {
+                html += `
+                    <p>Lokace: ${req.lat.toFixed(5)}, ${req.lng.toFixed(5)}</p>
+                    <button class="btn green" onclick="approveLocation('${req.id}')">Schválit polohu</button>
+                    <button class="btn red" onclick="rejectLocation('${req.id}')">Zamítnout</button>
+                `;
+            } else if (req.status === 'task_response_pending') {
+                html += `<p><em>Čekám na vypracování úkolu...</em></p>`;
+            } else if (req.status === 'review_pending') {
+                html += `<p><strong>Odpověď:</strong></p>`;
+                if (req.response.content && req.response.responseType === 'file') {
+                    // Check extension
+                    if (req.response.content.match(/\.(jpg|jpeg|png|gif)$/i)) {
+                        html += `<img src="/uploads/${req.response.content}" style="max-width:100%;border-radius:4px;">`;
+                    } else {
+                        html += `<a href="/uploads/${req.response.content}" target="_blank">Stáhnout soubor</a>`;
+                    }
+                } else {
+                    html += `<p>${req.response.content}</p>`;
+                }
+                html += `
+                    <button class="btn green" onclick="approveTask('${req.id}', true)">Splněno (Zabrat)</button>
+                    <button class="btn red" onclick="approveTask('${req.id}', false)">Nesplněno</button>
+                `;
+            }
+            return html;
+        }
+
+        window.approveLocation = (reqId) => {
+            currentReqIdForTask = reqId;
+            document.getElementById('task-input').value = "Vyfoťte se u stromu."; // Default text
+            document.getElementById('task-modal').style.display = 'block';
+            document.getElementById('modal-backdrop').style.display = 'block';
+        };
+
+        window.closeTaskModal = () => {
+            document.getElementById('task-modal').style.display = 'none';
+            document.getElementById('modal-backdrop').style.display = 'none';
+            currentReqIdForTask = null;
+        };
+
+        window.confirmTask = () => {
+            const task = document.getElementById('task-input').value;
+            if (task && currentReqIdForTask) {
+                socket.emit('admin_verify_location', { reqId: currentReqIdForTask, approved: true, taskText: task });
+                closeTaskModal();
+            } else {
+                alert("Zadejte text úkolu!");
+            }
+        };
+
+        window.rejectLocation = (reqId) => {
+            if(confirm("Opravdu zamítnout?")) {
+                socket.emit('admin_verify_location', { reqId, approved: false });
+            }
+        };
+
+        window.approveTask = (reqId, approved) => {
+            console.log("Approving task:", reqId, approved);
+            socket.emit('admin_verify_task', { reqId: reqId, approved: approved });
+        };
+
+        function addAdminMarker(req) {
+            if(req.status === 'pending' || req.status === 'task_response_pending' || req.status === 'review_pending') {
+                // If exists, update or don't duplicate. 
+                // Better to remove and re-add to ensure style update if needed, but let's just check existence.
+                if(adminRequestMarkers[req.id]) return;
+
+                const color = teamColors[req.teamId] || '#333';
+
+                const marker = L.circleMarker([req.lat, req.lng], {
+                    radius: 8,
+                    fillColor: color,
+                    color: "#fff",
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.9
+                }).addTo(map);
+                
+                marker.bindPopup(`
+                    <strong>Tým: ${req.teamId}</strong><br>
+                    Žádost o území: ${req.territoryId}<br>
+                    <button onclick="map.setView([${req.lat}, ${req.lng}], 18)">Přiblížit</button>
+                `);
+                
+                adminRequestMarkers[req.id] = marker;
+            }
+        }
+
+        // --- Map Logic ---
+
+        const map = L.map('map').setView([50.0755, 16.310], 15);
+        
+        // OpenStreetMap
+        const osmLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19, attribution: '&copy; OpenStreetMap'
+        });
+
+        // WMS ČÚZK ZTM (using correct WMTS URL for Google Maps/Web Mercator projection)
+        const ztmLayer = L.tileLayer('https://ags.cuzk.cz/arcgis1/rest/services/ZTM_WM/MapServer/WMTS/tile/1.0.0/ZTM_WM/default/default028mm/{z}/{y}/{x}.jpg', {
+            attribution: '&copy; <a href="https://cuzk.cz">ČÚZK</a>',
+            maxZoom: 18
+        });
+
+        // Default to ZTM (or OSM if preferred)
+        ztmLayer.addTo(map);
+
+        // Layer Control
+        const baseMaps = {
+            "ZTM 10 (ČÚZK)": ztmLayer,
+            "OpenStreetMap": osmLayer
+        };
+        L.control.layers(baseMaps).addTo(map);
+
+        let geoJsonLayer;
+        let savedPositions = {};
+
+        // Load saved positions first
+        fetch('labels.json')
+            .then(res => res.ok ? res.json() : {})
+            .then(positions => {
+                savedPositions = positions;
+                return fetch('CTH_geo.geojson');
+            })
+            .then(res => {
+                if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                return res.json();
+            })
+            .then(data => {
+                console.log("GeoJSON loaded:", data);
+                geoJsonLayer = L.geoJSON(data, {
+                    style: { color: "#000", weight: 2, fillOpacity: 0.1 },
+                    onEachFeature: (feature, layer) => {
+                        const id = feature.properties.Text;
+                        
+                        // Click handler
+                        layer.on('click', () => {
+                            const t = globalTerritories[id];
+                            const now = Date.now() / 1000;
+                            
+                            if (t && t.lockedUntil && t.lockedUntil > now) {
+                                const remaining = Math.ceil((t.lockedUntil - now) / 60);
+                                alert(`Území ${id} je uzamčeno. Zbývá ${remaining} min.`);
+                                return;
+                            }
+
+                            if (currentRole === 'team') {
+                                if (confirm(`Chcete zabrat území č. ${id}?`)) {
+                                    requestLocationCheck(id);
+                                }
+                            } else {
+                                alert(`Území ${id}`);
+                            }
+                        });
+
+                        // Labels
+                        if (feature.geometry.type === 'Polygon' || feature.geometry.type === 'MultiPolygon') {
+                            try {
+                                let center;
+                                
+                                // 1. Try saved position
+                                if (savedPositions[id]) {
+                                    center = L.latLng(savedPositions[id].lat, savedPositions[id].lng);
+                                } 
+                                // 2. Try Polylabel
+                                else {
+                                    let coords = feature.geometry.coordinates;
+                                    if(feature.geometry.type === 'MultiPolygon') coords = coords[0];
+                                    
+                                    try {
+                                        const p = polylabel(coords, 0.000001);
+                                        center = L.latLng(p[1], p[0]);
+                                    } catch (e) {
+                                        console.warn("Polylabel failed for", id, e);
+                                        // 3. Fallback to center
+                                        center = layer.getBounds().getCenter();
+                                    }
+                                }
+                                
+                                const marker = L.marker(center, {
+                                    icon: L.divIcon({
+                                        className: 'label-icon', html: id,
+                                        iconSize: [24,24], iconAnchor: [12,12]
+                                    }),
+                                    interactive: false
+                                }).addTo(map);
+                                
+                                territoryLabels[id] = marker;
+
+                            } catch (err) {
+                                console.error("Error creating label for feature", id, err);
+                            }
+                        }
+                    }
+                }).addTo(map);
+                
+                // Fit bounds
+                if (geoJsonLayer.getBounds().isValid()) {
+                    map.fitBounds(geoJsonLayer.getBounds());
+                } else {
+                    console.warn("GeoJSON bounds not valid");
+                }
+            })
+            .catch(err => {
+                console.error("Error loading GeoJSON:", err);
+                alert("Nepodařilo se načíst mapu území: " + err.message);
+            });
+
+        function updateTerritoryLabels() {
+            const now = Date.now() / 1000;
+            
+            for (const id in territoryLabels) {
+                const marker = territoryLabels[id];
+                const t = globalTerritories[id];
+                let isLocked = false;
+                
+                if (t && t.lockedUntil && t.lockedUntil > now) {
+                    isLocked = true;
+                }
+                
+                // Only update if needed to avoid flickering/reflows (optional optimization)
+                // But Leaflet's setIcon is reasonably fast.
+                
+                if (isLocked) {
+                    marker.setIcon(L.divIcon({
+                        className: 'label-icon locked',
+                        html: '🔒', // Lock icon
+                        iconSize: [24,24],
+                        iconAnchor: [12,12]
+                    }));
+                } else {
+                    marker.setIcon(L.divIcon({
+                        className: 'label-icon',
+                        html: id,
+                        iconSize: [24,24],
+                        iconAnchor: [12,12]
+                    }));
+                }
+            }
+        }
+
+        function updateMapColors(territoryState) {
+            if (!geoJsonLayer) return;
+            
+            // teamColors moved to global scope
+
+            geoJsonLayer.eachLayer(layer => {
+                const id = layer.feature.properties.Text;
+                if (territoryState[id]) {
+                    const owner = territoryState[id].owner;
+                    layer.setStyle({
+                        fillColor: teamColors[owner] || '#333',
+                        fillOpacity: 0.5,
+                        color: teamColors[owner] || '#000',
+                        weight: 3
+                    });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
