@@ -64,6 +64,15 @@
                 max-height: 50vh;
                 border-radius: 16px 16px 0 0;
             }
+
+            /* Force leaderboard to be small on mobile too */
+            #leaderboard-panel {
+                top: 50px;
+                left: 10px;
+                width: 250px; /* Slightly narrower */
+                max-width: 70vw;
+                max-height: 40vh;
+            }
             
             /* Move leaderboard button to bottom left on mobile */
             .leaderboard-toggle-btn {
@@ -510,73 +519,44 @@
         }
 
         function updateLeaderboardUI() {
-            const timeScores = {};
-            const countScores = {};
-            const teamList = Object.keys(teamNames);
-            const now = Date.now() / 1000;
+            const scores = {}; // team -> total seconds
+            const now = Date.now() / 1000; // Client time in seconds
 
-            // Init
-            teamList.forEach(team => {
-                timeScores[team] = globalScores[team] || 0;
-                countScores[team] = 0;
+            // Initialize scores with historical data
+            Object.keys(teamNames).forEach(team => {
+                scores[team] = globalScores[team] || 0;
             });
 
-            // Calculate current stats
+            // Add current session duration for active territories
             for (const tId in globalTerritories) {
                 const t = globalTerritories[tId];
-                if (t.owner) {
-                    // Count
-                    countScores[t.owner] = (countScores[t.owner] || 0) + 1;
-                    
-                    // Time (Current session)
-                    if (t.capturedAt) {
-                         const duration = now - t.capturedAt;
-                         if (duration > 0) {
-                             timeScores[t.owner] = (timeScores[t.owner] || 0) + duration;
-                         }
+                if (t.owner && t.capturedAt) {
+                    const duration = now - t.capturedAt;
+                    if (duration > 0) {
+                        scores[t.owner] = (scores[t.owner] || 0) + duration;
                     }
                 }
             }
 
-            // Rank by Time
-            const timeRanked = [...teamList].sort((a, b) => timeScores[b] - timeScores[a]);
-            const timeRanks = {};
-            timeRanked.forEach((team, index) => timeRanks[team] = index + 1);
+            // Convert to array and sort
+            const sortedTeams = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
 
-            // Rank by Count
-            const countRanked = [...teamList].sort((a, b) => countScores[b] - countScores[a]);
-            const countRanks = {};
-            countRanked.forEach((team, index) => countRanks[team] = index + 1);
-
-            // Final Rank (Average placement)
-            const finalScores = {};
-            teamList.forEach(team => {
-                finalScores[team] = (timeRanks[team] + countRanks[team]) / 2;
-            });
-            const finalRanked = [...teamList].sort((a, b) => finalScores[a] - finalScores[b]); // Lower is better
-
-            // Render Tables
-            renderTable('leaderboard-body-final', finalRanked, finalScores, '', true);
-            renderTable('leaderboard-body-time', timeRanked, timeScores, '', false, true);
-            renderTable('leaderboard-body-count', countRanked, countScores, '');
-        }
-
-        function renderTable(tbodyId, rankedTeams, scoresObj, suffix, isAvg = false, isTime = false) {
-            const tbody = document.getElementById(tbodyId);
-            if(!tbody) return;
+            // Render
+            const tbody = document.getElementById('leaderboard-body');
+            if (!tbody) return;
             tbody.innerHTML = '';
 
-            rankedTeams.forEach((team, index) => {
-                let valStr = scoresObj[team];
-                if(isTime) valStr = formatTime(valStr);
-                else if(isAvg) valStr = valStr.toFixed(1); // 1 decimal for average
-                
+            sortedTeams.forEach((team, index) => {
+                const timeStr = formatTime(scores[team]);
                 const row = document.createElement('tr');
-                // Highlight top 3
+                
+                // Medals for top 3
                 let medal = '';
-                if(index === 0) medal = '🥇 ';
-                if(index === 1) medal = '🥈 ';
-                if(index === 2) medal = '🥉 ';
+                if (scores[team] > 0) {
+                    if(index === 0) medal = '🥇 ';
+                    if(index === 1) medal = '🥈 ';
+                    if(index === 2) medal = '🥉 ';
+                }
 
                 row.innerHTML = `
                     <td>
@@ -584,7 +564,7 @@
                         <span class="team-dot" style="background-color: ${teamColors[team] || '#ccc'}"></span>
                         ${teamNames[team] || team}
                     </td>
-                    <td style="font-family:monospace; font-weight:bold;">${valStr}${suffix}</td>
+                    <td style="font-family:monospace; font-weight:bold;">${timeStr}</td>
                 `;
                 tbody.appendChild(row);
             });
