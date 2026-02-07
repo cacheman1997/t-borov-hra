@@ -832,7 +832,13 @@
         }
 
         function getRequestHTML(req) {
-            let html = `<h4>Tým: ${req.teamId} (Území ${req.territoryId})</h4>`;
+            let timeStr = "";
+            if (req.timestamp) {
+                const date = new Date(req.timestamp * 1000);
+                timeStr = `<span style="font-size:0.8em; color:#999; float:right;">${date.getHours()}:${date.getMinutes().toString().padStart(2, '0')}:${date.getSeconds().toString().padStart(2, '0')}</span>`;
+            }
+
+            let html = `<h4>Tým: ${req.teamId} (Území ${req.territoryId}) ${timeStr}</h4>`;
             
             if (req.status === 'pending') {
                 html += `

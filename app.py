@@ -204,6 +204,23 @@ def handle_admin_verify_task(data):
                 emit('territory_update', territories[territory_id], to=team_room) # Notify winner
                 socketio.emit('game_state_update', {'territories': territories, 'scores': team_scores}) # Notify everyone
                 
+                # --- NEW: Cancel other requests for this territory ---
+                reqs_to_remove = []
+                for other_rid, other_req in active_requests.items():
+                    if other_rid != req_id and str(other_req.get('territoryId')) == territory_id:
+                        reqs_to_remove.append(other_rid)
+                        # Notify the other team
+                        other_team_room = f"team_{other_req['teamId']}"
+                        emit('error_message', {'message': f'Území {territory_id} bylo právě zabráno jiným týmem! Vaše žádost byla zrušena.'}, to=other_team_room)
+                        # Force reset their UI
+                        emit('request_cancelled_confirmation', {}, to=other_team_room)
+
+                for rid in reqs_to_remove:
+                    if rid in active_requests:
+                        del active_requests[rid]
+                        emit('request_removed', {'reqId': rid}, to='admin')
+                # -----------------------------------------------------
+
             emit('task_result', {'approved': approved, 'territoryId': req['territoryId']}, to=team_room)
             
             # Cleanup request
