@@ -220,6 +220,28 @@
             z-index: 10000;
             font-size: 14px;
         }
+        /* Leaderboard Tabs */
+        .leaderboard-tabs {
+            display: flex;
+            gap: 5px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #eee;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 8px 4px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: bold;
+            color: #7f8c8d;
+            font-size: 13px;
+        }
+        .tab-btn.active {
+            border-bottom-color: #2c3e50;
+            color: #2c3e50;
+        }
     </style>
 </head>
 <body>
@@ -267,18 +289,36 @@
             <h2>Žebříček</h2>
             <button onclick="toggleLeaderboard()" style="background:none;border:none;font-size:1.5rem;cursor:pointer;">&times;</button>
         </div>
-        <p>Pořadí podle času držení území:</p>
-        <table class="leaderboard-table">
-            <thead>
-                <tr>
-                    <th>Tým</th>
-                    <th>Čas</th>
-                </tr>
-            </thead>
-            <tbody id="leaderboard-body">
-                <!-- Data populated by JS -->
-            </tbody>
-        </table>
+        
+        <div class="leaderboard-tabs">
+            <button class="tab-btn active" onclick="switchTab('final')">Finále</button>
+            <button class="tab-btn" onclick="switchTab('count')">Počet</button>
+            <button class="tab-btn" onclick="switchTab('time')">Čas</button>
+        </div>
+
+        <div id="tab-final" class="tab-content" style="display:block;">
+            <p style="font-size:12px;margin:5px 0;"><strong>Finální pořadí</strong> (průměr umístění):</p>
+            <table class="leaderboard-table">
+                <thead><tr><th>Tým</th><th>Průměr</th></tr></thead>
+                <tbody id="leaderboard-body-final"></tbody>
+            </table>
+        </div>
+
+        <div id="tab-count" class="tab-content" style="display:none;">
+            <p style="font-size:12px;margin:5px 0;"><strong>Počet</strong> zabraných území:</p>
+            <table class="leaderboard-table">
+                <thead><tr><th>Tým</th><th>Ks</th></tr></thead>
+                <tbody id="leaderboard-body-count"></tbody>
+            </table>
+        </div>
+
+        <div id="tab-time" class="tab-content" style="display:none;">
+            <p style="font-size:12px;margin:5px 0;"><strong>Celkový čas</strong> držení:</p>
+            <table class="leaderboard-table">
+                <thead><tr><th>Tým</th><th>Čas</th></tr></thead>
+                <tbody id="leaderboard-body-time"></tbody>
+            </table>
+        </div>
     </div>
 
     <div id="map"></div>
@@ -503,12 +543,11 @@
             // Show target
             document.getElementById('tab-' + tabName).style.display = 'block';
             
-            // Activate button (find by onclick text roughly or index)
-            // Simpler: iterate buttons and check onclick attribute, or just rely on text
+            // Activate button
             const btns = document.querySelectorAll('.tab-btn');
             if(tabName === 'final') btns[0].classList.add('active');
-            if(tabName === 'time') btns[1].classList.add('active');
-            if(tabName === 'count') btns[2].classList.add('active');
+            if(tabName === 'count') btns[1].classList.add('active');
+            if(tabName === 'time') btns[2].classList.add('active');
         }
 
         function formatTime(seconds) {
@@ -519,44 +558,73 @@
         }
 
         function updateLeaderboardUI() {
-            const scores = {}; // team -> total seconds
-            const now = Date.now() / 1000; // Client time in seconds
+            const timeScores = {};
+            const countScores = {};
+            const teamList = Object.keys(teamNames);
+            const now = Date.now() / 1000;
 
-            // Initialize scores with historical data
-            Object.keys(teamNames).forEach(team => {
-                scores[team] = globalScores[team] || 0;
+            // Init
+            teamList.forEach(team => {
+                timeScores[team] = globalScores[team] || 0;
+                countScores[team] = 0;
             });
 
-            // Add current session duration for active territories
+            // Calculate current stats
             for (const tId in globalTerritories) {
                 const t = globalTerritories[tId];
-                if (t.owner && t.capturedAt) {
-                    const duration = now - t.capturedAt;
-                    if (duration > 0) {
-                        scores[t.owner] = (scores[t.owner] || 0) + duration;
+                if (t.owner) {
+                    // Count
+                    countScores[t.owner] = (countScores[t.owner] || 0) + 1;
+                    
+                    // Time (Current session)
+                    if (t.capturedAt) {
+                         const duration = now - t.capturedAt;
+                         if (duration > 0) {
+                             timeScores[t.owner] = (timeScores[t.owner] || 0) + duration;
+                         }
                     }
                 }
             }
 
-            // Convert to array and sort
-            const sortedTeams = Object.keys(scores).sort((a, b) => scores[b] - scores[a]);
+            // Rank by Time
+            const timeRanked = [...teamList].sort((a, b) => timeScores[b] - timeScores[a]);
+            const timeRanks = {};
+            timeRanked.forEach((team, index) => timeRanks[team] = index + 1);
 
-            // Render
-            const tbody = document.getElementById('leaderboard-body');
-            if (!tbody) return;
+            // Rank by Count
+            const countRanked = [...teamList].sort((a, b) => countScores[b] - countScores[a]);
+            const countRanks = {};
+            countRanked.forEach((team, index) => countRanks[team] = index + 1);
+
+            // Final Rank (Average placement)
+            const finalScores = {};
+            teamList.forEach(team => {
+                finalScores[team] = (timeRanks[team] + countRanks[team]) / 2;
+            });
+            const finalRanked = [...teamList].sort((a, b) => finalScores[a] - finalScores[b]); // Lower is better
+
+            // Render Tables
+            renderTable('leaderboard-body-final', finalRanked, finalScores, '', true);
+            renderTable('leaderboard-body-count', countRanked, countScores, '');
+            renderTable('leaderboard-body-time', timeRanked, timeScores, '', false, true);
+        }
+
+        function renderTable(tbodyId, rankedTeams, scoresObj, suffix, isAvg = false, isTime = false) {
+            const tbody = document.getElementById(tbodyId);
+            if(!tbody) return;
             tbody.innerHTML = '';
 
-            sortedTeams.forEach((team, index) => {
-                const timeStr = formatTime(scores[team]);
-                const row = document.createElement('tr');
+            rankedTeams.forEach((team, index) => {
+                let valStr = scoresObj[team];
+                if(isTime) valStr = formatTime(valStr);
+                else if(isAvg) valStr = valStr.toFixed(1); // 1 decimal for average
                 
-                // Medals for top 3
+                const row = document.createElement('tr');
+                // Highlight top 3
                 let medal = '';
-                if (scores[team] > 0) {
-                    if(index === 0) medal = '🥇 ';
-                    if(index === 1) medal = '🥈 ';
-                    if(index === 2) medal = '🥉 ';
-                }
+                if(index === 0) medal = '🥇 ';
+                if(index === 1) medal = '🥈 ';
+                if(index === 2) medal = '🥉 ';
 
                 row.innerHTML = `
                     <td>
@@ -564,7 +632,7 @@
                         <span class="team-dot" style="background-color: ${teamColors[team] || '#ccc'}"></span>
                         ${teamNames[team] || team}
                     </td>
-                    <td style="font-family:monospace; font-weight:bold;">${timeStr}</td>
+                    <td style="font-family:monospace; font-weight:bold;">${valStr}${suffix}</td>
                 `;
                 tbody.appendChild(row);
             });
