@@ -409,6 +409,26 @@
             console.log("Connected to server");
         });
 
+        // Login Response
+        socket.on('login_response', (data) => {
+            if (data.success) {
+                currentUser = data.teamId;
+                currentRole = data.role;
+                
+                document.getElementById('login-overlay').style.display = 'none';
+                
+                // Join socket room
+                socket.emit('join_game', { role: currentRole, teamId: currentUser });
+
+                if (currentRole === 'admin') {
+                    document.getElementById('admin-panel').style.display = 'block';
+                }
+            } else {
+                document.getElementById('login-error').innerText = data.message;
+                document.getElementById('login-error').style.display = 'block';
+            }
+        });
+
         // Admin: Receive new request
         socket.on('new_request', (req) => {
             if(currentRole === 'admin') {
@@ -677,23 +697,8 @@
             const pwd = document.getElementById('password').value;
             
             if (!team) return;
-            if (pwd !== '1234') { // Simple password
-                document.getElementById('login-error').innerText = "Špatné heslo";
-                document.getElementById('login-error').style.display = 'block';
-                return;
-            }
-
-            currentUser = team;
-            currentRole = team === 'admin' ? 'admin' : 'team';
             
-            document.getElementById('login-overlay').style.display = 'none';
-            
-            // Join socket room
-            socket.emit('join_game', { role: currentRole, teamId: currentUser });
-
-            if (currentRole === 'admin') {
-                document.getElementById('admin-panel').style.display = 'block';
-            }
+            socket.emit('login_request', { teamId: team, password: pwd });
         }
 
         function showLoading(text) {
@@ -1007,6 +1012,12 @@
                             }
 
                             if (currentRole === 'team') {
+                                // Check if already owned by me
+                                if (t && t.owner === currentUser) {
+                                    alert("Toto území už máš zabrané!");
+                                    return;
+                                }
+
                                 if (confirm(`Chcete zabrat území č. ${id}?`)) {
                                     requestLocationCheck(id);
                                 }

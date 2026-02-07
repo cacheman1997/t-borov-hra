@@ -24,6 +24,18 @@ teams = {}
 # team_scores: { "red": 1234.5 }
 team_scores = {}
 
+# Passwords
+TEAM_PASSWORDS = {
+    "cerveni":  "58vrlW43",
+    "modri":  "fXtKZeEs",
+    "zeleni":  "qOCQTcxR",
+    "zluti":  "ZTBny5Ho",
+    "oranzovi":  "Hly3pIc4",
+    "fialovi":  "PCKYa5Fl",
+    "bilí":  "BLVXM9t6",
+    "admin":  "CpUu9KSh"
+}
+
 @app.route('/')
 def index():
     return send_from_directory('.', 'index.html')
@@ -50,6 +62,17 @@ def upload_file():
 @socketio.on('connect')
 def handle_connect():
     print('Client connected')
+
+@socketio.on('login_request')
+def handle_login_request(data):
+    # data: { teamId, password }
+    team = data.get('teamId')
+    pwd = data.get('password')
+    
+    if team in TEAM_PASSWORDS and TEAM_PASSWORDS[team] == pwd:
+        emit('login_response', {'success': True, 'teamId': team, 'role': 'admin' if team == 'admin' else 'team'})
+    else:
+        emit('login_response', {'success': False, 'message': 'Špatné heslo'})
 
 @socketio.on('join_game')
 def handle_join(data):
