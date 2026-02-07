@@ -128,6 +128,7 @@ def handle_admin_verify(data):
         # If rejected, remove request
         if not approved:
             del active_requests[req_id]
+            emit('request_removed', {'reqId': req_id}, to='admin')
         else:
             # Update request to wait for task response
             req['type'] = 'task_response_pending'

@@ -443,6 +443,12 @@
              if(currentRole === 'admin') {
                  const el = document.getElementById(`req-${data.reqId}`);
                  if(el) el.remove();
+                 
+                 // Remove marker
+                 if(adminRequestMarkers[data.reqId]) {
+                     map.removeLayer(adminRequestMarkers[data.reqId]);
+                     delete adminRequestMarkers[data.reqId];
+                 }
              }
         });
 
