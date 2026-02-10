@@ -87,6 +87,17 @@ def handle_join(data):
         teams[team_id] = request.sid
         emit('map_update', territories, to=request.sid) # Send current map state
         emit('init_scores', team_scores, to=request.sid) # Send scores
+        
+        # Check for active request for this team
+        existing_req = None
+        for rid, req in active_requests.items():
+            if req.get('teamId') == team_id:
+                existing_req = req
+                break
+        
+        if existing_req:
+            emit('restore_request', existing_req, to=request.sid)
+
         print(f"Team {team_id} joined")
     elif role == 'admin':
         join_room('admin')
@@ -114,6 +125,12 @@ def handle_location_check(data):
             else:
                  # Lock expired, cleanup optional but good practice
                  print(f"DEBUG: Lock expired for {territory_id}")
+
+    # Check if team already has an active request
+    for req in active_requests.values():
+        if req.get('teamId') == data.get('teamId'):
+            emit('error_message', {'message': 'Máte již aktivní žádost! Musíte ji nejprve zrušit.'}, to=request.sid)
+            return
 
     req_id = os.urandom(4).hex()
     new_req = {

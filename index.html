@@ -497,6 +497,33 @@
             if(currentRole === 'admin') updateAdminRequestUI(req);
         });
 
+        // Team: Restore Request State
+        socket.on('restore_request', (req) => {
+            myRequest = req;
+            
+            // Re-create marker if location exists
+            if (req.lat && req.lng) {
+                if (myLocationMarker) map.removeLayer(myLocationMarker);
+                myLocationMarker = L.circleMarker([req.lat, req.lng], {
+                    radius: 10,
+                    fillColor: "#3388ff",
+                    color: "#fff",
+                    weight: 3,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(map);
+                map.setView([req.lat, req.lng], 18);
+            }
+
+            if (req.status === 'pending') {
+                showLoading("Čekám na schválení adminem...");
+            } else if (req.status === 'approved' || req.type === 'task_response_pending') {
+                showTaskUI(req.taskText, req.id);
+            } else if (req.status === 'review_pending') {
+                showLoading("Odesláno ke kontrole...");
+            }
+        });
+
         // Team: Location Verification Result
         socket.on('location_verification_result', (data) => {
             hideLoading();
