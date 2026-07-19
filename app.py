@@ -26,14 +26,14 @@ team_scores = {}
 
 # Passwords
 TEAM_PASSWORDS = {
-    "cerveni":  "58vrlW43",
-    "modri":  "fXtKZeEs",
-    "zeleni":  "qOCQTcxR",
-    "zluti":  "ZTBny5Ho",
-    "oranzovi":  "Hly3pIc4",
-    "fialovi":  "PCKYa5Fl",
-    "bilí":  "BLVXM9t6",
-    "admin":  "CpUu9KSh"
+    "modra":  "nebe",
+    "zelena":  "list",
+    "ruzova":  "zvykacka",
+    "cerna":  "uhel",
+    "hneda":  "hlina",
+    "zluta":  "slunce",
+    "cervena":  "jahoda",
+    "admin":  "pandicka"
 }
 
 @app.route('/')

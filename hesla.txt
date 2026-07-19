@@ -1,23 +1,23 @@
-Tým: cerveni
-Heslo: 58vrlW43
+Tým: modra
+Heslo: nebe
 
-Tým: modri
-Heslo: fXtKZeEs
+Tým: zelena
+Heslo: list
 
-Tým: zeleni
-Heslo: qOCQTcxR
+Tým: ruzova
+Heslo: zvykacka
 
-Tým: zluti
-Heslo: ZTBny5Ho
+Tým: cerna
+Heslo: uhel
 
-Tým: oranzovi
-Heslo: Hly3pIc4
+Tým: hneda
+Heslo: hlina
 
-Tým: fialovi
-Heslo: PCKYa5Fl
+Tým: zluta
+Heslo: slunce
 
-Tým: bilí
-Heslo: BLVXM9t6
+Tým: cervena
+Heslo: jahoda
 
 Tým: admin
-Heslo: CpUu9KSh
+Heslo: pandicka

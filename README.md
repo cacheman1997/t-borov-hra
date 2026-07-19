@@ -34,7 +34,10 @@ Tento projekt je připraven pro nasazení na [Railway.app](https://railway.app).
 
 ## Pravidla a Ovládání
 1. **Přihlášení:**
-   - Heslo pro všechny týmy i admina je `1234`.
+   - Každý tým má vlastní heslo podle barevně odpovídající věci:
+     `Modrá = nebe`, `Zelená = list`, `Růžová = zvykacka`, `Černá = uhel`,
+     `Hnědá = hlina`, `Žlutá = slunce`, `Červená = jahoda`.
+   - Heslo pro admina je `pandicka`.
    - Vyberte si tým nebo roli "Admin".
 
 2. **Hráč (Tým):**
