@@ -12,7 +12,7 @@ app.config['UPLOAD_FOLDER'] = 'uploads'
 # Ensure upload directory exists
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="threading")
 
 # In-memory storage (replace with DB for persistence)
 # territories: { "1": { "owner": "red", "capturedAt": timestamp } }
